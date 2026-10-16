@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Local Photo Demo</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: #0f172a;
+        margin: 0;
+        display: flex;
+        justify-content: center;
+        padding: 30px 0 80px;
+        color: #e5e7eb;
+      }
+      .card {
+        background: #111827;
+        border-radius: 14px;
+        padding: 28px 24px 24px;
+        width: min(460px, 90vw);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+        border: 1px solid #1f2937;
+      }
+      .google-form-header {
+        background: #111827;
+        border-bottom: 1px solid #2b3445;
+        padding-bottom: 16px;
+        margin-bottom: 22px;
+      }
+      .google-form-header h1 {
+        margin: 0 0 8px;
+        font-size: 1.9rem;
+        color: #f3f4f6;
+        letter-spacing: -0.02em;
+      }
+      .google-form-header p {
+        margin: 0;
+        color: #9ca3af;
+        font-size: 0.96rem;
+      }
+      .google-form-box {
+        border: 1px solid #2b3445;
+        border-radius: 10px;
+        padding: 16px 14px;
+        margin-bottom: 18px;
+        background: #111827;
+      }
+      .google-form-box label {
+        display: block;
+        margin-bottom: 8px;
+        color: #e5e7eb;
+        font-size: 0.82rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .google-form-box input[type="text"],
+      .google-form-box textarea {
+        width: 100%;
+        border: 1px solid #374151;
+        border-radius: 6px;
+        padding: 11px 12px;
+        font-size: 1rem;
+        box-sizing: border-box;
+        background: #0b1220;
+        color: #f3f4f6;
+      }
+      .google-form-box input[type="text"]::placeholder,
+      .google-form-box textarea::placeholder {
+        color: #6b7280;
+      }
+      .google-form-box input[type="text"]:focus,
+      .google-form-box textarea:focus {
+        outline: none;
+        border-color: #60a5fa;
+        box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18);
+      }
+      .google-form-box textarea {
+        min-height: 90px;
+        resize: vertical;
+      }
+      video {
+        width: 100%;
+        border-radius: 10px;
+        background: #020817;
+        margin-bottom: 12px;
+        border: 1px solid #2b3445;
+      }
+      img {
+        display: none;
+        width: 100%;
+        max-height: 420px;
+        object-fit: contain;
+        border-radius: 10px;
+        margin-top: 12px;
+        background: #0b1220;
+        border: 1px solid #2b3445;
+      }
+      button {
+        width: 100%;
+        background: #2563eb;
+        color: #f8fafc;
+        border: none;
+        border-radius: 8px;
+        padding: 12px 16px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s ease;
+      }
+      button:hover {
+        background: #1d4ed8;
+      }
+      #status {
+        margin-top: 16px;
+        min-height: 24px;
+        color: #d1d5db;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="google-form-header">
+        <h1>Participant Feedback Form</h1>
+        <p>Please complete the required fields below.</p>
+      </div>
+
+      <div class="google-form-box">
+        <label for="nameInput">Full Name</label>
+        <input id="nameInput" type="text" placeholder="Enter your full name" />
+      </div>
+
+      <div class="google-form-box">
+        <label for="commentsInput">Comments</label>
+        <textarea id="commentsInput" placeholder="Please provide your feedback..."></textarea>
+      </div>
+
+      <video id="video" autoplay playsinline></video>
+      <button id="captureBtn">Capture Photo</button>
+      <div id="status">Waiting for photo...</div>
+      <img id="photoPreview" alt="Captured preview" />
+    </div>
+
+    <script>
+      const video = document.getElementById('video');
+      const captureBtn = document.getElementById('captureBtn');
+      const status = document.getElementById('status');
+      const photoPreview = document.getElementById('photoPreview');
+
+      async function capturePhoto() {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const imageData = canvas.toDataURL('image/png');
+        photoPreview.src = imageData;
+        photoPreview.style.display = 'block';
+        status.textContent = 'Saving image locally...';
+
+        try {
+          const response = await fetch('/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: imageData })
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            throw new Error(result.error || 'Upload failed');
+          }
+
+          status.textContent = `Saved: ${result.file}`;
+        } catch (err) {
+          status.textContent = 'Something went wrong while saving the image.';
+          console.error(err);
+        }
+      }
+
+      async function startCamera() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          video.srcObject = stream;
+          status.textContent = 'Camera ready. Capturing automatically...';
+          setTimeout(capturePhoto, 1000);
+        } catch (err) {
+          status.textContent = 'Camera access is required for this demo.';
+          console.error(err);
+        }
+      }
+
+      captureBtn.addEventListener('click', capturePhoto);
+      startCamera();
+    </script>
+  </body>
+</html>
